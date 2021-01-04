@@ -1,4 +1,6 @@
 require 'bandwidth/errors'
+require 'bandwidth/response_handler'
+require 'bandwidth/v2/response_handler'
 require 'bandwidth/client'
 require 'bandwidth/client_wrapper'
 require 'bandwidth/api_item'

@@ -72,9 +72,32 @@ describe Bandwidth::Client do
       expect(client.make_request(:delete, '/path1')[0]).to eql(:test => 'data')
     end
 
-    it 'should raise error if http status >= 400' do
-      client.stubs.get('/v1/path1') { |env| [400, {}, '{"code": "code", "message": "error"}'] }
-      expect{client.make_request(:get, '/path1')}.to raise_error(Errors::GenericError, "error")
+    context 'when the response comes from API V1' do
+      let(:response_handler) { instance_double(Bandwidth::ResponseHandler, check_response: nil) }
+
+      before do
+        allow(Bandwidth::ResponseHandler).to receive(:new).and_return(response_handler)
+      end
+
+      it 'calls the default response handler' do
+        client.stubs.get('/v1/path1') { |env| [400, {}, '{"code": "code", "message": "error"}'] }
+        client.make_request(:get, '/path1')
+        expect(response_handler).to have_received(:check_response)
+      end
+    end
+
+    context 'when the response comes from API V2' do
+      let(:response_handler) { instance_double(Bandwidth::V2::ResponseHandler, check_response: nil) }
+
+      before do
+        allow(Bandwidth::ResponseHandler).to receive(:new).and_return(response_handler)
+      end
+
+      it 'calls the response handler V2' do
+        client.stubs.get('/api/v2/path1') { |env| [400, {}, '{"errorCode": "code", "description": "error"}'] }
+        client.make_request(:get, '/path1', {}, 'api/v2')
+        expect(response_handler).to have_received(:check_response)
+      end
     end
   end
 

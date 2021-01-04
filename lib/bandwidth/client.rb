@@ -6,6 +6,11 @@ module Bandwidth
 
   # Catapult client class. It is used by any api related class
   class Client
+    RESPONSE_HANDLERS = {
+      'v1' => Bandwidth::ResponseHandler,
+      'api/v2' => Bandwidth::V2::ResponseHandler
+    }
+
     # Initializer
     # @param user_id [String|Hash] user id to connect to Catapult API. If value is hash it will be used as options storage
     # @param api_token [String] token to connect to Catapult API.
@@ -89,7 +94,7 @@ module Bandwidth
     def make_request(method, path, data = {}, api_version = 'v1', api_endpoint = '')
       d  = camelcase(data)
       build_path = lambda {|path| "/#{api_version}" + (if path[0] == "/" then path else "/#{path}" end) }
-      
+
       # A somewhat less ideal solution to the V1/V2 endpoint split
       # If no endpoint is defined, use default connection
       if api_endpoint.length == 0
@@ -125,13 +130,11 @@ module Bandwidth
       [r, symbolize(response.headers || {})]
     end
 
-    # Check response object and raise error if status code >= 400
+    # Delegates the response checking to a response handler according to the API version
     # @param response response object
     def check_response(response)
-      if response.status >= 400
-        parsed_body = JSON.parse(response.body)
-        raise Errors::GenericError.new(parsed_body['code'], parsed_body['message'])
-      end
+      response_handler = RESPONSE_HANDLERS[api_version].new(response)
+      response_handler.check_response
     end
 
     # Build url path like /users/<user-id>/<path>
@@ -157,7 +160,7 @@ module Bandwidth
           v.each do |k, val|
             if( k.to_s == 'sip_headers') # Don't camel case the sip headers, they probably start with X- which is required by the API to be upper case
               result[k.to_s().camelcase(:lower)] = val
-            else     
+            else
               result[k.to_s().camelcase(:lower)] = camelcase(val)
             end
           end
